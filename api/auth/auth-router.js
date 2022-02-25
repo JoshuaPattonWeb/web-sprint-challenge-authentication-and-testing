@@ -1,7 +1,26 @@
 const router = require('express').Router();
+const bcrypt = require('bcryptjs')
+const Users = require('../users/users-model')
+const tokenBuild = require('./token-build')
 
-router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+const {
+  checkPayload,
+  uniqueUsername,
+  checkLoginPayload
+} = require('../auth/auth-middleware')
+
+
+router.post('/register', checkPayload, uniqueUsername, (req, res, next) => {
+  const { username, password } = req.body
+  const hash = bcrypt.hashSync(password, 8)
+
+  Users.add({ username, password: hash })
+    .then(newUser => {
+      res.status(200).json(newUser)
+    })
+    .catch(next)
+
+  
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -29,8 +48,24 @@ router.post('/register', (req, res) => {
   */
 });
 
-router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+router.post('/login', checkPayload, checkLoginPayload, (req, res, next) => {
+  const { username, password } = req.body
+    Users.findByUsername(username)
+    .then(([user]) => {
+      if(user && bcrypt.compareSync(password, user.password)) {
+        const token = tokenBuild(user)
+        res.status(200).json({
+          message: `HELLO, ${username}!`,
+          token
+        })
+      } else {
+        next({
+          status: 401,
+          message: 'invalid credentials'
+        })
+      }
+    })
+    .catch(next)
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
